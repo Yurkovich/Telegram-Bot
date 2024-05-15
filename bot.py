@@ -1,5 +1,6 @@
 import telebot
 from youtube import search_video
+from database import add_query
 
 # Настройки Telegram бота
 bot = telebot.TeleBot('7087734459:AAHE1kURiluqCMZXtNNaFd6sJHudoegO6kw')
@@ -12,11 +13,17 @@ def send_welcome(message):
 # Обработчик для текстовых сообщений
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
-    video_title, video_url = search_video(message.text)
-    if video_title and video_url:
-        bot.send_message(message.chat.id, f"Найдено видео: {video_title}\n{video_url}")
+    video_path = search_video(message.text)
+    if video_path:
+        add_query(message.chat.id, message.text)  # Изменили эту строку
+        send_video(bot, message.chat.id, video_path)
     else:
-        bot.send_message(message.chat.id, "Видео не найдено.")
+        bot.reply_to(message, "К сожалению, не удалось найти видео по вашему запросу.")
+
+# Функция для отправки видеофайла пользователю
+def send_video(bot, chat_id, video_path):
+    with open(video_path, 'rb') as video_file:
+        bot.send_video(chat_id, video_file)
 
 # Запуск бота
 bot.polling()

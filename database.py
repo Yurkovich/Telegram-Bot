@@ -10,16 +10,17 @@ def create_table():
     cursor = conn.cursor()
     cursor.execute('''CREATE TABLE IF NOT EXISTS user_queries (
                       id INTEGER PRIMARY KEY,
+                      telegram_id INTEGER,
                       query TEXT
                       )''')
     conn.commit()
     conn.close()
 
 # Добавление запроса пользователя в базу данных
-def add_query(query):
+def add_query(telegram_id, query):
     conn = create_connection()
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO user_queries (query) VALUES (?)", (query,))
+    cursor.execute("INSERT INTO user_queries (telegram_id, query) VALUES (?, ?)", (telegram_id, query))
     conn.commit()
     conn.close()
 

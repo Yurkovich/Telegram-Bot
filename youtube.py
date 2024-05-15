@@ -1,25 +1,37 @@
+import os
+from pytube import YouTube
 from googlesearch import search
-import requests
-from bs4 import BeautifulSoup
+
+def get_video_info(query):
+    # Используем Google поиск для получения URL первого видео
+    search_results = search(query + " site:youtube.com", num=1, stop=1)
+
+    # Получаем URL первого видео
+    video_url = next(search_results, None)
+    if video_url:
+        return video_url
+    else:
+        return None
+
+def download_video(video_url):
+    # Создаем объект YouTube и загружаем видео
+    yt = YouTube(video_url)
+    video = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
+
+    # Задаем путь для сохранения видео
+    save_path = os.path.join('downloads', yt.title + ".mp4")
+
+    # Скачиваем видео на сервер
+    video.download(output_path='downloads', filename=yt.title + ".mp4")
+
+    return save_path
 
 def search_video(query):
-    # Выполняем поиск запроса в Google
-    search_results = search(query + " site:youtube.com", num=5, stop=5, pause=2)
-    
-    # Перебираем результаты поиска
-    for url in search_results:
-        # Извлекаем только URL-адреса YouTube
-        if "youtube.com" in url:
-            # Получаем HTML-страницу видео
-            html_content = requests.get(url).text
-            soup = BeautifulSoup(html_content, 'html.parser')
-            
-            # Находим заголовок и URL видео
-            video_title = soup.find("meta", itemprop="name")["content"]
-            video_url = url
-            
-            # Возвращаем заголовок и URL первого найденного видео
-            return video_title, video_url
-    
-    # Если не найдено ни одного видео на YouTube
-    return None, None
+    # Получаем URL видео
+    video_url = get_video_info(query)
+    if video_url:
+        # Скачиваем видео на сервер
+        video_path = download_video(video_url)
+        return video_path
+    else:
+        return None
