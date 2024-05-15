@@ -1,6 +1,7 @@
 import os
 from pytube import YouTube
 from googlesearch import search
+from moviepy.editor import VideoFileClip
 
 def get_video_info(query):
     # Используем Google поиск для получения URL первого видео
@@ -26,12 +27,25 @@ def download_video(video_url):
 
     return save_path
 
-def search_video(query):
+def convert_to_audio(video_path, video_title):
+    audio_path = f'downloads/{video_title}.mp3'
+    clip = VideoFileClip(video_path)
+    clip.audio.write_audiofile(audio_path)
+    clip.close()
+    return audio_path
+
+# Функция для удаления временных файлов
+def cleanup(video_path, audio_path):
+    os.remove(video_path)
+    os.remove(audio_path)
+
+def search_and_convert_video(query):
     # Получаем URL видео
     video_url = get_video_info(query)
     if video_url:
         # Скачиваем видео на сервер
         video_path = download_video(video_url)
-        return video_path
+        audio_path = convert_to_audio(video_path, os.path.splitext(os.path.basename(video_path))[0])
+        return video_path, audio_path
     else:
-        return None
+        return None, None
