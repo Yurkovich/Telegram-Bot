@@ -1,5 +1,6 @@
 
 import asyncio
+import re
 import os
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackContext
@@ -8,28 +9,78 @@ from config import TOKEN
 from auth.bot_auth import authenticate_user
 from auth.bot_registration import register_user
 from auth.database import create_db
+import time
+from functools import wraps
 
 logged_in_users = {}
 
+# Декоратор для ограничения частоты вызовов функции
+
+
+def rate_limit(seconds):
+    def decorator(func):
+        last_called = 0  # Здесь будем хранить время последнего вызова функции
+
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            nonlocal last_called  # Используем nonlocal для доступа к last_called
+
+            # Получаем текущее время
+            current_time = time.time()
+
+            # Проверяем, прошло ли достаточно времени с момента последнего вызова
+            if current_time - last_called < seconds:
+                await args[0].message.reply_text("Пожалуйста, подождите некоторое время перед отправкой нового запроса.")
+                return
+
+            # Если прошло достаточно времени, вызываем функцию
+            last_called = current_time  # Обновляем время последнего вызова
+            return await func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
 async def start(update: Update, context: CallbackContext) -> None:
-    await update.message.reply_text("Привет! Для начала работы отправьте команду /register <логин> <пароль> для регистрации.")
-    # await update.message.reply_text(update.message)
-    # telegram_id = update.message["from"]["id"]
-    # telegram_name = update.message["chat"]["username"]
-    # print(telegram_id, telegram_name)
+    user_id = update.effective_user.id
+
+    # Проверяем, залогинен ли пользователь
+    if user_id in logged_in_users.values():
+        await update.message.reply_text("Введи название песни, которую мы ищем.")
+    else:
+        await update.message.reply_text("Привет! Для начала работы отправьте команду /register <логин> <пароль> для регистрации, либо /login <логин> <пароль> для авторизации.")
 
 
 async def register(update: Update, context: CallbackContext) -> None:
-    
     message = update.message.text.split()
     if len(message) != 3:
         await update.message.reply_text("Используйте команду /register <логин> <пароль>")
         return
     username = message[1]
     password = message[2]
-    telegram_name = update.message["chat"]["username"]
-    telegram_id = update.message["from"]["id"]
-    
+
+    # Проверяем, соответствуют ли длины логина и пароля минимальным требованиям
+    if len(username) < 7:
+        await update.message.reply_text("Минимальная длина логина - 7 символов.")
+        return
+    if len(password) < 8:
+        await update.message.reply_text("Минимальная длина пароля - 8 символов.")
+        return
+
+    # Проверяем, соответствуют ли логин и пароль разрешенным символам
+    if not re.match(r'^[A-Za-z0-9_]+$', username) or not re.match(r'^[A-Za-z0-9_]+$', password):
+        await update.message.reply_text("Логин и пароль могут содержать только буквы латинского алфавита, цифры и символ подчеркивания.")
+        return
+
+    # Проверяем, чтобы логин не начинался с символа подчеркивания
+    if username.startswith('_'):
+        await update.message.reply_text("Логин не должен начинаться с символа подчеркивания.")
+        return
+
+    telegram_name = await update.message.chat.username
+    telegram_id = await update.message.from_user.id
+
     # Проверяем, существует ли пользователь с таким логином
     if authenticate_user(username, password):
         await update.message.reply_text("Пользователь с таким логином уже существует.")
@@ -39,13 +90,12 @@ async def register(update: Update, context: CallbackContext) -> None:
     register_user(username, password, telegram_name, telegram_id)
     await update.message.reply_text("Регистрация прошла успешно.")
 
+
 # Функция авторизации пользователя
-
-
 async def login(update: Update, context: CallbackContext) -> None:
     message = update.message.text.split()
     if len(message) != 3:
-        update.message.reply_text("Используйте команду /login <логин> <пароль>")
+        await update.message.reply_text("Используйте команду /login <логин> <пароль>")
         return
     username = message[1]
     password = message[2]
@@ -62,6 +112,7 @@ async def login(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("Авторизация прошла успешно.")
     else:
         await update.message.reply_text("Неверный логин или пароль.")
+
 
 async def logout(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
@@ -80,32 +131,33 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await update.message.reply_text("Вы можете использовать следующие команды:\n/start - начать взаимодействие с ботом\n/help - получить справку о командах")
 
 
+@rate_limit(10)
 async def search_and_send_video(update: Update, context: CallbackContext) -> None:
     # Получаем ID пользователя, отправившего сообщение
     user_id = update.effective_user.id
-    
     # Проверяем, залогинен ли пользователь
     if user_id not in logged_in_users.values():
         await handle_authentication_required(update)
         return
 
     user_message = update.message.text
-    
+
     try:
         if await check_duration(user_message):
             video_url = await get_video_url(user_message)
             video_title = await download_video(video_url)
             video_path = f"./downloads/video/{video_title}"
-            
+
             await wait_for_download(video_path)
             await send_video(update, context, video_title, video_path)
             remove_video(video_path)
         else:
             await handle_long_video(update)
-        
+
     except Exception as e:
         print(f"Ошибка при поиске и отправке видео: {e}")
         await handle_error(update)
+
 
 async def handle_authentication_required(update: Update) -> None:
     await update.message.reply_text("Для использования этой функции необходимо авторизоваться. Пожалуйста, войдите в систему с помощью /login или зарегистрируйтесь с помощью /register.")
