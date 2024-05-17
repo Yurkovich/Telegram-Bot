@@ -57,7 +57,5 @@ async def video_downloader(video_url, max_retries=3, retry_interval=10):
                 print("Превышено количество попыток. Загрузка видео не удалась.")
                 return None
 
-
-# Допустимые символы в названии видео
 def simplify_video_title(video_title):
     return re.sub(r'[^\w\s]', '', video_title)
