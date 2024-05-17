@@ -1,8 +1,10 @@
-import aiosqlite
+import sqlite3
 
 
-async def create_db():
-    async with aiosqlite.connect('users.db') as db:
-        await db.execute('''CREATE TABLE IF NOT EXISTS users
-                            (id INTEGER PRIMARY KEY, telegram_id INT, username VARCHAR(30), password VARCHAR(50))''')
-        await db.commit()
+def create_db():
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS users
+                (id INTEGER PRIMARY KEY, telegram_id INT, telegram_name TEXT, username VARCHAR(30), password VARCHAR(50))''')
+    conn.commit()
+    conn.close()
