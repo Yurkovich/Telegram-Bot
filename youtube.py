@@ -2,6 +2,18 @@ from youtubesearchpython.__future__ import *
 from pytube import YouTube
 import re
 
+async def check_duration(user_request: str):
+    videosSearch = VideosSearch(
+        user_request, limit=1, language='ru', region='RU')
+    videosResult = await videosSearch.next()
+    video_duration = videosResult["result"][0]["duration"]
+
+    splited = video_duration.split(':')
+    seconds = int(splited[0]) * 60 + int(splited[1])
+    if seconds > 240:
+        return False
+    else:
+        return True
 
 async def get_url(user_request: str):
     videosSearch = VideosSearch(
@@ -17,7 +29,7 @@ async def get_url(user_request: str):
 
 async def video_downloader(video_url):
     my_video = YouTube(video_url)
-    stream = my_video.streams.get_highest_resolution()
+    stream = my_video.streams.get_by_resolution('720p')
     # Определяем имя файла, удаляем лишние символы
     video_title = simplify_video_title(my_video.title)
     # Добавляем расширение .mp4 к имени файла

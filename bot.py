@@ -1,42 +1,43 @@
 
-
-TOKEN = "7198719536:AAHxIiuXTtN9wwFJj1EiLa0LBIzOFWk5jD0"
-
-
 import asyncio
 import os
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
-from youtube import get_url, video_downloader, simplify_video_title
+from youtube import get_url, video_downloader, simplify_video_title, check_duration
+from config import TOKEN
 
 
 async def search_and_send_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_message = update.message.text
     
     try:
-        video_url = await get_url(user_message)
-        video_title = await video_downloader(video_url)
-        
-        # Определяем путь к загруженному видео
-        video_path = f"./downloads/video/{video_title}"
-        
-        # Ожидаем завершения загрузки
-        while not os.path.exists(video_path):
-            await asyncio.sleep(3)
+        if await check_duration(user_message):
 
-        # Отправляем видео пользователю
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=f"Вот ваше видео: {video_title}"
-        )
-        await context.bot.send_video(
-            chat_id=update.effective_chat.id,
-            video=open(video_path, 'rb'),
-            supports_streaming=True
-        )
+            video_url = await get_url(user_message)
+            video_title = await video_downloader(video_url)
+            
+            # Определяем путь к загруженному видео
+            video_path = f"./downloads/video/{video_title}"
+            
+            # Ожидаем завершения загрузки
+            while not os.path.exists(video_path):
+                await asyncio.sleep(1)
 
-        # Удаляем файл после отправки
-        os.remove(video_path)
+            # Отправляем видео пользователю
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=f"Вот ваше видео: {video_title}"
+            )
+            await context.bot.send_video(
+                chat_id=update.effective_chat.id,
+                video=open(video_path, 'rb'),
+                supports_streaming=True
+            )
+
+            # Удаляем файл после отправки
+            os.remove(video_path)
+        else:
+            await update.message.reply_text("Видео слишком длинное. Максимальная длина видео - 4 минуты")
         
     except Exception as e:
         print(f"Ошибка при поиске и отправке видео: {e}")
