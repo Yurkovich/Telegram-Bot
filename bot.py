@@ -1,65 +1,72 @@
 
-import asyncio
-import logging
-import os
-import sys
-from telegram import InputFile, InputMediaVideo
-from telegram import ForceReply, Update
-from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
-
-from youtube import search_and_download, get_url
-
 
 TOKEN = "7198719536:AAHxIiuXTtN9wwFJj1EiLa0LBIzOFWk5jD0"
 
-async def send_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    video_path = r'.\downloads\video\SID×RAM - RAMSING.mp4'
-    if os.path.isfile(video_path) and os.access(video_path, os.R_OK):
-        with open(video_path, 'rb') as video_file:
-            await context.bot.send_video(
-                chat_id=update.effective_chat.id,
-                video=video_file,
-                supports_streaming=True
-            )
-    else:
-        await update.message.reply_text("Видеофайл не найден или недоступен для чтения")
+
+import asyncio
+import os
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from youtube import get_url, video_downloader, simplify_video_title
 
 
+async def search_and_send_video(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_message = update.message.text
+    
+    try:
+        video_url = await get_url(user_message)
+        video_title = await video_downloader(video_url)
+        
+        # Определяем путь к загруженному видео
+        video_path = f"./downloads/video/{video_title}"
+        
+        # Ожидаем завершения загрузки
+        while not os.path.exists(video_path):
+            await asyncio.sleep(3)
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send a message when the command /start is issued."""
-    await update.message.reply_text("Hola!")
-    await send_video(update, context)
+        # Отправляем видео пользователю
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"Вот ваше видео: {video_title}"
+        )
+        await context.bot.send_video(
+            chat_id=update.effective_chat.id,
+            video=open(video_path, 'rb'),
+            supports_streaming=True
+        )
+
+        # Удаляем файл после отправки
+        os.remove(video_path)
+        
+    except Exception as e:
+        print(f"Ошибка при поиске и отправке видео: {e}")
+        await update.message.reply_text("Произошла ошибка при поиске и отправке видео.")
 
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send a message when the command /help is issued."""
-    await update.message.reply_text("Help!")
+def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Отправляет приветственное сообщение."""
+    update.message.reply_text("Привет! Отправьте мне сообщение с запросом видео.")
 
 
-async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Echo the user message."""
-    await update.message.reply_text(update.message.text)
+def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Отправляет сообщение с описанием доступных команд."""
+    update.message.reply_text("Вы можете использовать следующие команды:\n/start - начать взаимодействие с ботом\n/help - получить справку о командах")
 
 
 def main() -> None:
-    """Start the bot."""
-    # Create the Application and pass it your bot's token.
     application = Application.builder().token(TOKEN).build()
 
-    # on different commands - answer in Telegram
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
 
-    # on non command i.e message - echo the message on Telegram
     application.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND, echo))
+        filters.TEXT & ~filters.COMMAND, search_and_send_video))
 
-    # Run the bot until the user presses Ctrl-C
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":
-    print('Start bot . . .')
+    print('Запуск бота...')
     asyncio.run(main())
-    print('Stopped bot . . .')
+    print('Бот остановлен.')
+
