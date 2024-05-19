@@ -37,12 +37,19 @@ async def start(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("Привет! Для начала работы отправьте команду /register <логин> <пароль> для регистрации, либо /login <логин> <пароль> для авторизации.")
 
 async def register(update: Update, context: CallbackContext) -> None:
+    user_id = update.effective_user.id
+    if user_id in logged_in_users.values():
+        await update.message.reply_text("Вы уже залогинены и не можете зарегистрировать новый аккаунт.")
+        return
+    
     message = update.message.text.split()
     if len(message) != 3:
         await update.message.reply_text("Используйте команду /register <логин> <пароль>")
         return
+    
     username = message[1]
     password = message[2]
+
     if len(username) < 7:
         await update.message.reply_text("Минимальная длина логина - 7 символов.")
         return
@@ -55,8 +62,10 @@ async def register(update: Update, context: CallbackContext) -> None:
     if username.startswith('_'):
         await update.message.reply_text("Логин не должен начинаться с символа подчеркивания.")
         return
+    
     telegram_name = update.message.chat.username
     telegram_id = update.message.from_user.id
+    
     if authenticate_user(username, password):
         await update.message.reply_text("Пользователь с таким логином уже существует.")
         return
@@ -64,16 +73,24 @@ async def register(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text("Регистрация прошла успешно.")
 
 async def login(update: Update, context: CallbackContext) -> None:
+    user_id = update.effective_user.id
+    if user_id in logged_in_users.values():
+        await update.message.reply_text("Вы уже авторизованы. Чтобы войти в другой аккаунт, сначала разлогиньтесь с текущего.")
+        return
+    
     message = update.message.text.split()
     if len(message) != 3:
         await update.message.reply_text("Используйте команду /login <логин> <пароль>")
         return
+    
     username = message[1]
     password = message[2]
+
     for logged_user_username in logged_in_users:
         if logged_user_username == username:
             await update.message.reply_text("Вы уже авторизованы.")
             return
+        
     if authenticate_user(username, password):
         logged_in_users[username] = update.message.chat_id
         await update.message.reply_text("Авторизация прошла успешно.")
