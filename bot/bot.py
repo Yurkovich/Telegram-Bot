@@ -55,8 +55,8 @@ async def register(update: Update, context: CallbackContext) -> None:
     if username.startswith('_'):
         await update.message.reply_text("Логин не должен начинаться с символа подчеркивания.")
         return
-    telegram_name = await update.message.chat.username
-    telegram_id = await update.message.from_user.id
+    telegram_name = update.message.chat.username
+    telegram_id = update.message.from_user.id
     if authenticate_user(username, password):
         await update.message.reply_text("Пользователь с таким логином уже существует.")
         return
