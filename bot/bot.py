@@ -3,11 +3,9 @@ import re
 import os
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackContext
-from youtube import get_url, video_downloader, simplify_video_title, check_duration
+from youtube import get_url, video_downloader, check_duration
 from config import TOKEN
-from auth.bot_auth import authenticate_user
-from auth.bot_registration import register_user
-from auth.database import create_db
+from bot.auth.database import authenticate_user, register_user, create_db, save_query_to_database, create_queries_table
 import time
 from functools import wraps
 
@@ -29,6 +27,7 @@ def rate_limit(seconds):
         return wrapper
     return decorator
 
+
 async def start(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
     if user_id in logged_in_users.values():
@@ -36,17 +35,18 @@ async def start(update: Update, context: CallbackContext) -> None:
     else:
         await update.message.reply_text("Привет! Для начала работы отправьте команду /register <логин> <пароль> для регистрации, либо /login <логин> <пароль> для авторизации.")
 
+
 async def register(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
     if user_id in logged_in_users.values():
         await update.message.reply_text("Вы уже залогинены и не можете зарегистрировать новый аккаунт.")
         return
-    
+
     message = update.message.text.split()
     if len(message) != 3:
         await update.message.reply_text("Используйте команду /register <логин> <пароль>")
         return
-    
+
     username = message[1]
     password = message[2]
 
@@ -62,27 +62,28 @@ async def register(update: Update, context: CallbackContext) -> None:
     if username.startswith('_'):
         await update.message.reply_text("Логин не должен начинаться с символа подчеркивания.")
         return
-    
+
     telegram_name = update.message.chat.username
     telegram_id = update.message.from_user.id
-    
+
     if authenticate_user(username, password):
         await update.message.reply_text("Пользователь с таким логином уже существует.")
         return
     register_user(username, password, telegram_name, telegram_id)
     await update.message.reply_text("Регистрация прошла успешно.")
 
+
 async def login(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
     if user_id in logged_in_users.values():
         await update.message.reply_text("Вы уже авторизованы. Чтобы войти в другой аккаунт, сначала разлогиньтесь с текущего.")
         return
-    
+
     message = update.message.text.split()
     if len(message) != 3:
         await update.message.reply_text("Используйте команду /login <логин> <пароль>")
         return
-    
+
     username = message[1]
     password = message[2]
 
@@ -90,12 +91,14 @@ async def login(update: Update, context: CallbackContext) -> None:
         if logged_user_username == username:
             await update.message.reply_text("Вы уже авторизованы.")
             return
-        
+
     if authenticate_user(username, password):
         logged_in_users[username] = update.message.chat_id
         await update.message.reply_text("Авторизация прошла успешно.")
+        context.user_data['username'] = username
     else:
         await update.message.reply_text("Неверный логин или пароль.")
+
 
 async def logout(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
@@ -108,8 +111,10 @@ async def logout(update: Update, context: CallbackContext) -> None:
     else:
         await update.message.reply_text("Вы не были авторизованы.")
 
+
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text("Вы можете использовать следующие команды:\n/start - начать взаимодействие с ботом\n/help - получить справку о командах")
+
 
 @rate_limit(10)
 async def search_and_send_video(update: Update, context: CallbackContext) -> None:
@@ -132,18 +137,31 @@ async def search_and_send_video(update: Update, context: CallbackContext) -> Non
         print(f"Ошибка при поиске и отправке видео: {e}")
         await handle_error(update)
 
+    username = context.user_data.get('username')
+    if username:
+        user_id = user_id = update.effective_user.id
+        query = update.message.text
+        save_query_to_database(user_id, username, query)  # Передача логина пользователя для записи запроса
+    else:
+        handle_authentication_required(update)
+
+
 async def handle_authentication_required(update: Update) -> None:
     await update.message.reply_text("Для использования этой функции необходимо авторизоваться. Пожалуйста, войдите в систему с помощью /login или зарегистрируйтесь с помощью /register.")
+
 
 async def get_video_url(user_message: str) -> str:
     return await get_url(user_message)
 
+
 async def download_video(video_url: str) -> str:
     return await video_downloader(video_url)
+
 
 async def wait_for_download(video_path: str) -> None:
     while not os.path.exists(video_path):
         await asyncio.sleep(1)
+
 
 async def send_video(update: Update, context: ContextTypes.DEFAULT_TYPE, video_title: str, video_path: str) -> None:
     await context.bot.send_message(
@@ -156,14 +174,18 @@ async def send_video(update: Update, context: ContextTypes.DEFAULT_TYPE, video_t
         supports_streaming=True
     )
 
+
 def remove_video(video_path: str) -> None:
     os.remove(video_path)
+
 
 async def handle_long_video(update: Update) -> None:
     await update.message.reply_text("Видео слишком длинное. Максимальная длина видео - 4 минуты")
 
+
 async def handle_error(update: Update) -> None:
     await update.message.reply_text("Произошла ошибка при поиске и отправке видео.")
+
 
 def main() -> None:
     application = Application.builder().token(TOKEN).build()
@@ -176,8 +198,10 @@ def main() -> None:
 
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
+
 if __name__ == "__main__":
     create_db()
+    create_queries_table()
     print('Запуск бота...')
     asyncio.run(main())
     print('Бот остановлен.')
