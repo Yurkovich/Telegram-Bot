@@ -1,11 +1,10 @@
 import asyncio
 import re
-import os
-from telegram import InputFile, Update
+from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackContext
 from youtube import get_url, download_audio
 from config import TOKEN
-from auth.database import authenticate_user, register_user, create_db, save_query_to_database, create_queries_table
+from database import authenticate_user, register_user, create_db, save_query_to_database, create_queries_table
 from decorators import rate_limit
 
 logged_in_users = {}
@@ -17,10 +16,6 @@ async def start(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("Введи название песни, которую мы ищем.")
     else:
         await update.message.reply_text("Привет! Для начала работы отправьте команду /register <логин> <пароль> для регистрации, либо /login <логин> <пароль> для авторизации.")
-
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("Вы можете использовать следующие команды:\n/start - начать взаимодействие с ботом\n/help - получить справку о командах")
 
 
 async def register(update: Update, context: CallbackContext) -> None:
@@ -89,10 +84,18 @@ async def login(update: Update, context: CallbackContext) -> None:
 
 async def logout(update: Update, context: CallbackContext) -> None:
     user_id = update.effective_user.id
-    if user_id in logged_in_users:
-        logged_in_users.remove(user_id)
-        del context.user_data['username']
-        await update.message.reply_text("Вы успешно разлогинились.")
+    if user_id in logged_in_users.values():
+        username_to_remove = None
+        for username, chat_id in logged_in_users.items():
+            if chat_id == user_id:
+                username_to_remove = username
+                break
+        if username_to_remove:
+            del logged_in_users[username_to_remove]
+            del context.user_data['username']
+            await update.message.reply_text("Вы успешно разлогинились.")
+        else:
+            await update.message.reply_text("Произошла ошибка при разлогинивании.")
     else:
         await update.message.reply_text("Вы не были авторизованы.")
 
@@ -109,12 +112,11 @@ async def send_video_and_audio(update: Update, context: CallbackContext) -> None
         await update.message.reply_text(f"Ваша ссылка: {url}")
     except Exception as e:
         print(f"Ошибка при отправке ссылки: {e}")
-        await handle_error(update)
+        await update.message.reply_text("Произошла ошибка при поиске и отправке видео.")
 
+    username = context.user_data.get('username')
     try:
-        print(url[1])
         audio_path, _ = download_audio(url[0])
-
         if audio_path:
             await context.bot.send_audio(
                 chat_id=update.effective_chat.id,
@@ -125,7 +127,7 @@ async def send_video_and_audio(update: Update, context: CallbackContext) -> None
     except Exception as e:
         await update.message.reply_text(f"Не удалось загрузить аудио")
 
-    username = context.user_data.get('username')
+    
     if username:
         user_id = user_id = update.effective_user.id
         query = update.message.text
@@ -133,32 +135,13 @@ async def send_video_and_audio(update: Update, context: CallbackContext) -> None
     else:
         handle_authentication_required(update)
 
-async def send_audio(update: Update, context: ContextTypes.DEFAULT_TYPE, audio_title: str, audio_path: str) -> None:
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text=f"Вот ваше видео: {audio_title}"
-    )
-    await context.bot.send_audio(
-        chat_id=update.effective_chat.id,
-        audio=open(audio_path, 'rb'),
-        supports_streaming=True
-    )
 
 async def handle_authentication_required(update: Update) -> None:
     await update.message.reply_text("Для использования этой функции необходимо авторизоваться. Пожалуйста, войдите в систему с помощью /login или зарегистрируйтесь с помощью /register.")
 
-
-async def get_video_url(user_message: str) -> str:
-    return await get_url(user_message)
-
-
-async def handle_error(update: Update) -> None:
-    await update.message.reply_text("Произошла ошибка при поиске и отправке видео.")
-
-
 def main() -> None:
     application = Application.builder().token(TOKEN).build()
-    
+
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("register", register))
     application.add_handler(CommandHandler("login", login))
@@ -170,8 +153,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    create_db()
-    create_queries_table()
+    # create_db()
+    # create_queries_table()
     print('Запуск бота...')
     asyncio.run(main())
     print('Бот остановлен.')
