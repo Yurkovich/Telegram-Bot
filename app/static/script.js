@@ -1,30 +1,25 @@
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('registration-form');
 
-    form.addEventListener('submit', async function(event) {
-        event.preventDefault();
+const sendButton = document.getElementById("submitButton")
+sendButton.addEventListener('click', async function(event) {
+    event.preventDefault();
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const data = {"username": username, "password": password};
+    console.log(data);
+    try {
+        const response = await fetch('http://127.0.0.1:8000/users/', {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(data)
+        });
 
-        const formData = new FormData(form);
-        const username = formData.get('username');
-        const password = formData.get('password');
-
-        try {
-            const response = await fetch('/users/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({username, password}),
-            });
-
-            if (!response.ok) {
-                throw new Error('Registration failed');
-            }
-
+        if (response.ok) {
             alert('User registered successfully!');
-        } catch (error) {
+        } else {
             alert('Registration failed');
-            console.error(error);
         }
-    });
+    } catch (error) {
+        alert('Registration failed');
+        console.error(error);
+    }
 });
