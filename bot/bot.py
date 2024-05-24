@@ -4,7 +4,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackContext
 from youtube import get_url, download_audio
 from config import TOKEN
-from database import authenticate_user, register_user, create_db, save_query_to_database, create_queries_table
+from database import authenticate_user, register_user, create_db, save_query_to_database, create_queries_table, is_unique
 from decorators import rate_limit
 
 logged_in_users = {}
@@ -48,9 +48,10 @@ async def register(update: Update, context: CallbackContext) -> None:
     telegram_name = update.message.chat.username
     telegram_id = update.message.from_user.id
 
-    if authenticate_user(username, password):
+    if is_unique(username):
         await update.message.reply_text("Пользователь с таким логином уже существует.")
         return
+    
     register_user(username, password, telegram_name, telegram_id)
     await update.message.reply_text("Регистрация прошла успешно.")
 
@@ -153,8 +154,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    # create_db()
-    # create_queries_table()
+    create_db()
+    create_queries_table()
     print('Запуск бота...')
     asyncio.run(main())
     print('Бот остановлен.')

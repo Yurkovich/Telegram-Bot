@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Yurkovich Music</title>
+    <style>
+      body {
+        background-color: bisque;
+        display: flexbox;
+        justify-content: center;
+        align-items: center;
+      }
+      .title {
+        background-color: rgb(199, 173, 142);
+        text-align: center;
+        color: rgb(255, 234, 209);
+        text-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="title">
+      <h1>Yurkovich Music</h1>
+    </div>
+
+    <div class="container">
+      <input type="text" id="query" placeholder="Введите название песни" />
+      <button id="downloadButton">Получить</button>
+      <div id="result"></div>
+    </div>
+    <script>
+      const btnGetMusic = document.getElementById("downloadButton");
+      btnGetMusic.addEventListener('click', async function(event){
+    event.preventDefault()
+    const inputNameMusic = document.getElementById('query').value
+    const data = {"query": inputNameMusic}
+    const queryParams = new URLSearchParams(data).toString();
+    const response = await fetch(`http://127.0.0.1:8000/download/?${queryParams}`);
+    if (response.ok) {
+        const result = await response.json();
+        const audioPlayer = document.getElementById('audioPlayer');
+        audioPlayer.src = result.file_path;
+        const link = document.createElement('a');
+        link.href = result.file_path;
+        link.download = inputNameMusic + '.mp3';
+        link.textContent = 'ССЫЛКА НА СКАЧКУ';
+        document.body.appendChild(link);
+    } else {
+        console.error('Не получен файл');
+    }
+});
+    </script>
+  </body>
+</html>

@@ -1,10 +1,12 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 import sqlite3
-from schemas import UserSchemaCreate
+from schemas import UserCreate
+from music import search_and_download_music
 
 router = APIRouter()
 
 DATABASE_URL = r'C:\Education\Самоучеба\16.05.24\users.db'
+
 
 def get_db():
     conn = sqlite3.connect(DATABASE_URL)
@@ -13,18 +15,32 @@ def get_db():
     finally:
         conn.close()
 
-@router.post("/users/")
-def create_user(user: UserSchemaCreate):
+
+@router.post("/register/")
+def create_user(user: UserCreate):
     conn = sqlite3.connect(DATABASE_URL)
     cursor = conn.cursor()
     try:
         cursor.execute(
-            "INSERT INTO users_web (username, password) VALUES (?, ?)",
-            (user.username, user.password)  # Пароль пока сохраняем как есть, без хеширования
+            "INSERT INTO users (username, password, telegram_id, telegram_name) VALUES (?, ?, ?, ?)",
+            # Устанавливаем значения None для полей telegram_id и telegram_name
+            (user.username, user.password, None, None)
         )
         conn.commit()
         return {"username": user.username}
     except sqlite3.IntegrityError:
-        raise HTTPException(status_code=400, detail="Username already registered")
+        raise HTTPException(
+            status_code=400, detail="Пользователь с таким именем уже зарегистрирован!")
     finally:
         conn.close()
+
+
+@router.get("/download/")
+async def download_music(query: str):
+    try:
+        result_file = search_and_download_music(query)
+        return {"message": "Music downloaded successfully", "file_path": result_file}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+

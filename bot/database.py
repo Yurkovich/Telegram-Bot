@@ -2,19 +2,30 @@ import sqlite3
 
 
 def register_user(username, password, telegram_name, telegram_id):
-    conn = sqlite3.connect('users.db')
-    c = conn.cursor()
-    c.execute("INSERT INTO users (username, password, telegram_name, telegram_id) VALUES (?, ?, ?, ?)",
-              (username, password, telegram_name, telegram_id))
-    conn.commit()
-    conn.close()
-
+    try:
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute("INSERT INTO users (username, password, telegram_name, telegram_id) VALUES (?, ?, ?, ?)",
+                  (username, password, telegram_name, telegram_id))
+        conn.commit()
+        conn.close()
+    except:
+        return False
+    
 
 def authenticate_user(username, password):
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
     c.execute("SELECT * FROM users WHERE username=? AND password=?",
               (username, password))
+    user = c.fetchone()
+    conn.close()
+    return user is not None
+
+def is_unique(username):
+    conn = sqlite3.connect('users.db')
+    c = conn.cursor()
+    c.execute("SELECT * FROM users WHERE username=?", (username,))
     user = c.fetchone()
     conn.close()
     return user is not None
@@ -33,7 +44,8 @@ def create_db():
     conn = sqlite3.connect('users.db')
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS users
-                (id INTEGER PRIMARY KEY, telegram_id INT, telegram_name TEXT, username VARCHAR(30), password VARCHAR(50))''')
+                (id INTEGER PRIMARY KEY, telegram_id INT, telegram_name TEXT,
+                username VARCHAR(30) UNIQUE, password VARCHAR(50))''')
     conn.commit()
     conn.close()
 
@@ -68,5 +80,3 @@ def clear_queries(id):
     c.execute("DELETE FROM user_queries WHERE id=?", (id,))
     conn.commit()
     conn.close()
-
-
