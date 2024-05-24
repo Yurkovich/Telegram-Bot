@@ -5,9 +5,11 @@ from fastapi.templating import Jinja2Templates
 task_template = APIRouter()
 templates = Jinja2Templates(directory='templates')
 
+
 @task_template.get('/')
 def index():
-    return RedirectResponse(url="/login")
+    return RedirectResponse(url="/music")
+
 
 @task_template.get('/signup')
 def signup(request: Request):
@@ -18,3 +20,7 @@ def signup(request: Request):
 def login(request: Request):
     return templates.TemplateResponse(request=request, name='login.html')
 
+
+@task_template.get('/music')
+def login(request: Request):
+    return templates.TemplateResponse(request=request, name='music.html')
