@@ -1,46 +1,40 @@
-from fastapi import APIRouter, HTTPException
+import logging
+from fastapi import APIRouter, HTTPException, Request
 import sqlite3
-from schemas import UserCreate
+
+from fastapi.responses import FileResponse
+from fastapi.security import HTTPBasic
+from schemas import QueryMusicSchema, User
 from music import search_and_download_music
 
 router = APIRouter()
+security = HTTPBasic()
 
 DATABASE_URL = r'C:\Education\Самоучеба\16.05.24\users.db'
 
 
-def get_db():
-    conn = sqlite3.connect(DATABASE_URL)
-    try:
-        yield conn
-    finally:
-        conn.close()
+@router.post('/download/')
+async def download_music(request: Request, query_music: QueryMusicSchema):
+    file_name = search_and_download_music(query=query_music.query)
+    if file_name:
+        return FileResponse(path=file_name, media_type="audio", filename=file_name)
 
 
-@router.post("/register/")
-def create_user(user: UserCreate):
+@router.post("/api/login")
+def login(user: User):
+    logging.info(f"Received login request for username: {user.username}")
+
     conn = sqlite3.connect(DATABASE_URL)
     cursor = conn.cursor()
-    try:
-        cursor.execute(
-            "INSERT INTO users (username, password, telegram_id, telegram_name) VALUES (?, ?, ?, ?)",
-            # Устанавливаем значения None для полей telegram_id и telegram_name
-            (user.username, user.password, None, None)
-        )
-        conn.commit()
-        return {"username": user.username}
-    except sqlite3.IntegrityError:
+    cursor.execute("SELECT * FROM users WHERE username = ? AND password = ?",
+                   (user.username, user.password))
+    db_user = cursor.fetchone()
+    conn.close()
+
+    logging.info(f"Database query result: {db_user}")
+
+    if db_user:
+        return {"message": "Login successful"}
+    else:
         raise HTTPException(
-            status_code=400, detail="Пользователь с таким именем уже зарегистрирован!")
-    finally:
-        conn.close()
-
-
-@router.get("/download/")
-async def download_music(query: str):
-    try:
-        result_file = search_and_download_music(query)
-        return {"message": "Music downloaded successfully", "file_path": result_file}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
+            status_code=401, detail="Invalid username or password")

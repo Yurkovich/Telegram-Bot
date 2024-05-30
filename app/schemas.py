@@ -2,6 +2,10 @@
 from pydantic import BaseModel, Field, field_validator
 import re
 
+class User(BaseModel):
+    username: str
+    password: str
+
 class UserCreate(BaseModel):
     username: str = Field(..., min_length=7)
     password: str = Field(..., min_length=8)
@@ -19,3 +23,6 @@ class UserCreate(BaseModel):
         if not re.match(r'^[A-Za-z0-9_]+$', v):
             raise ValueError("Пароль может содержать только буквы латинского алфавита, цифры и символ подчеркивания.")
         return v
+    
+class QueryMusicSchema(BaseModel):
+    query: str
