@@ -2,11 +2,9 @@ import logging
 import os
 from fastapi import APIRouter, HTTPException, Request
 import sqlite3
-
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBasic
-from pydantic import BaseModel
-from schemas import QueryMusicSchema, User
+from schemas import QueryMusicSchema, User, UserRegistration
 from music import search_and_download_music
 
 router = APIRouter()
@@ -14,9 +12,21 @@ security = HTTPBasic()
 
 DATABASE_URL = r'C:\Education\Самоучеба\16.05.24\users.db'
 
-
-class QueryMusicSchema(BaseModel):
-    query: str
+@router.post("/api/register")
+async def register_user(user_data: UserRegistration):
+    conn = sqlite3.connect(DATABASE_URL)
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT INTO users (username, password) VALUES (?, ?)",
+            (user_data.username, user_data.password)
+        )
+        conn.commit()
+        return {"message": "User registered successfully"}
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    finally:
+        conn.close()
 
 
 @router.post('/download/')

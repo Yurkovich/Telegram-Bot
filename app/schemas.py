@@ -1,4 +1,3 @@
-
 from pydantic import BaseModel, Field, field_validator
 import re
 
@@ -6,7 +5,7 @@ class User(BaseModel):
     username: str
     password: str
 
-class UserCreate(BaseModel):
+class UserRegistration(BaseModel):
     username: str = Field(..., min_length=7)
     password: str = Field(..., min_length=8)
 

@@ -89,7 +89,7 @@
       <h1>Yurkovich Music</h1>
     </div>
     <div id="blur-background" class="blur"></div>
-    <div class="form-container">
+    <div class="form-container" id="authFormContainer">
       <form id="auth-form">
         <h2>Login</h2>
         <label for="username">Username:</label>
@@ -97,6 +97,17 @@
         <label for="password">Password:</label>
         <input type="password" id="password" name="password" required />
         <button type="submit">Submit</button>
+        <p id="registerLink">
+          Нет аккаунта? <a href="#" id="registerLinkText">Зарегистрироваться</a>
+        </p>
+      </form>
+      <form id="register-form" style="display: none">
+        <h2>Register</h2>
+        <label for="newUsername">Username:</label>
+        <input type="text" id="newUsername" name="newUsername" required />
+        <label for="newPassword">Password:</label>
+        <input type="password" id="newPassword" name="newPassword" required />
+        <button type="submit">Register</button>
       </form>
     </div>
     <div class="container">
@@ -107,6 +118,26 @@
       </div>
     </div>
     <script>
+      document
+        .getElementById("registerLinkText")
+        .addEventListener("click", function (event) {
+          event.preventDefault();
+          const authForm = document.getElementById("auth-form");
+          const registerForm = document.getElementById("register-form");
+          const registerLink = document.getElementById("registerLink");
+          if (authForm.style.display !== "none") {
+            authForm.style.display = "none";
+            registerForm.style.display = "block";
+            registerLink.innerHTML =
+              "Уже есть аккаунт? <a href='#' id='loginLinkText'>Войти</a>";
+          } else {
+            authForm.style.display = "block";
+            registerForm.style.display = "none";
+            registerLink.innerHTML =
+              "Нет аккаунта? <a href='#' id='registerLinkText'>Зарегистрироваться</a>";
+          }
+        });
+
       const btnGetMusic = document.getElementById("downloadButton");
       const audioPlayerContainer = document.getElementById(
         "audioPlayerContainer"
@@ -214,6 +245,41 @@
       // Загружаем сохраненные песни при загрузке страницы
       window.addEventListener("load", loadSongsFromLocalStorage);
 
+      document
+        .getElementById("register-form")
+        .addEventListener("submit", async function (event) {
+          event.preventDefault();
+          const newUsername = document.getElementById("newUsername").value;
+          const newPassword = document.getElementById("newPassword").value;
+
+          console.log("Sending data:", {
+            username: newUsername,
+            password: newPassword,
+          });
+
+          const response = await fetch("/api/register", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              username: newUsername,
+              password: newPassword,
+            }),
+          });
+
+          if (response.ok) {
+            // Если регистрация прошла успешно, скрываем форму регистрации и отображаем форму авторизации
+            document.getElementById("register-form").style.display = "none";
+            document.getElementById("auth-form").style.display = "block";
+            document.getElementById("registerLink").innerHTML =
+              "Нет аккаунта? <a href='#' id='registerLinkText'>Зарегистрироваться</a>";
+          } else {
+            // Если произошла ошибка, выводим сообщение об ошибке
+            const responseData = await response.json();
+            alert("Error: " + responseData.detail);
+          }
+        });
       // Обработчик формы авторизации
       document
         .getElementById("auth-form")
