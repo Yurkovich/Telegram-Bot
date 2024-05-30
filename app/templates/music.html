@@ -7,24 +7,30 @@
     <style>
       body {
         background-color: bisque;
-        display: flexbox;
+        display: flex;
         justify-content: center;
         align-items: center;
+        flex-direction: column;
       }
-
+      .container {
+        margin-top: 20px; /* Добавляем отступ между заголовком и контейнером */
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
       .title {
         background-color: rgb(199, 173, 142);
         text-align: center;
+        width: 100%;
         color: rgb(255, 234, 209);
+        font-size: larger;
         text-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
       }
-
       .audio-player {
         margin-top: 20px;
         margin-left: 0;
       }
-
       .blur {
         position: fixed;
         top: 0;
@@ -35,7 +41,6 @@
         backdrop-filter: blur(10px);
         z-index: 1;
       }
-
       .form-container {
         position: fixed;
         top: 50%;
@@ -46,22 +51,18 @@
         box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
         z-index: 2;
       }
-
       form {
         display: flex;
         flex-direction: column;
       }
-
       label {
         margin-bottom: 5px;
       }
-
       input {
         margin-bottom: 15px;
         padding: 10px;
         font-size: 1em;
       }
-
       button {
         padding: 10px;
         font-size: 1em;
@@ -70,14 +71,23 @@
         border: none;
         cursor: pointer;
       }
+      .audio-player-container {
+        display: flex;
+        align-items: center;
+        margin-bottom: 15px;
+      }
+      .audio-player-container h2 {
+        margin-right: 10px;
+      }
+      .audio-player-container button {
+        margin-left: 10px;
+      }
     </style>
   </head>
-
   <body>
     <div class="title">
       <h1>Yurkovich Music</h1>
     </div>
-
     <div id="blur-background" class="blur"></div>
     <div class="form-container">
       <form id="auth-form">
@@ -89,18 +99,19 @@
         <button type="submit">Submit</button>
       </form>
     </div>
-
     <div class="container">
       <input type="text" id="query" placeholder="Введите название песни" />
       <button id="downloadButton">Получить</button>
-      <div class="audio-player">
-        <h2 id="songTitle"></h2>
-        <!-- Добавляем элемент для названия песни -->
-        <audio controls id="audioPlayer"></audio>
+      <div id="audioPlayerContainer" class="audio-player">
+        <!-- Новые аудиоплееры будут добавляться сюда -->
       </div>
     </div>
     <script>
       const btnGetMusic = document.getElementById("downloadButton");
+      const audioPlayerContainer = document.getElementById(
+        "audioPlayerContainer"
+      );
+
       btnGetMusic.addEventListener("click", async function (event) {
         event.preventDefault();
         const inputNameMusic = document.getElementById("query").value;
@@ -111,37 +122,99 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(data),
         });
+
         if (response.ok) {
-          const blob = await response.blob();
+          const responseData = await response.json();
+          const songUrl = responseData.file_url;
 
-          // Создаем новый аудиоплеер
-          const newAudioPlayer = document.getElementById("audioPlayer");
-          newAudioPlayer.controls = true;
-          newAudioPlayer.src = URL.createObjectURL(blob);
+          // Добавляем аудиоплеер
+          addAudioPlayer(inputNameMusic, songUrl);
 
-          // Обновляем заголовок текущей песни
-          const songTitle = document.getElementById("songTitle");
-          songTitle.textContent = `${inputNameMusic}`;
+          // Сохраняем песню в локальное хранилище
+          saveSongToLocalStorage(inputNameMusic, songUrl);
         } else {
           console.log("Не получен файл");
         }
       });
 
-      // Обработчик события клика для кнопки скачивания
-      document
-        .getElementById("audioPlayer")
-        .addEventListener("contextmenu", function (e) {
+      function addAudioPlayer(songTitle, songUrl) {
+        // Проверяем, существует ли уже аудиоплеер с таким заголовком в контейнере
+        const existingPlayer = document.querySelector(
+          `.audio-player-container h2[data-title="${songTitle}"]`
+        );
+        if (existingPlayer) {
+          console.log(`Аудиоплеер для песни "${songTitle}" уже существует.`);
+          return;
+        }
+
+        // Создаем новый контейнер для аудиоплеера, заголовка и кнопки удаления
+        const newMusicElement = document.createElement("div");
+        newMusicElement.classList.add("audio-player-container");
+
+        // Создаем заголовок для песни
+        const titleElement = document.createElement("h2");
+        titleElement.textContent = songTitle;
+        titleElement.setAttribute("data-title", songTitle); // Добавляем атрибут для идентификации заголовка
+
+        // Создаем новый аудиоплеер
+        const newAudioPlayer = document.createElement("audio");
+        newAudioPlayer.controls = true;
+        newAudioPlayer.src = songUrl;
+
+        // Создаем кнопку удаления
+        const deleteButton = document.createElement("button");
+        deleteButton.textContent = "Удалить песню";
+        deleteButton.style.marginRight = "10px"; // Добавляем отступ
+        deleteButton.addEventListener("click", function () {
+          removeSongFromLocalStorage(songTitle);
+          audioPlayerContainer.removeChild(newMusicElement);
+        });
+
+        // Добавляем заголовок, аудиоплеер и кнопку удаления в новый контейнер
+        newMusicElement.appendChild(titleElement);
+        newMusicElement.appendChild(newAudioPlayer);
+        newMusicElement.appendChild(deleteButton);
+
+        // Добавляем новый контейнер в основной контейнер
+        audioPlayerContainer.appendChild(newMusicElement);
+
+        // Добавляем обработчик события для контекстного меню на новом аудиоплеере
+        newAudioPlayer.addEventListener("contextmenu", function (e) {
           e.preventDefault();
-          const audioPlayer = document.getElementById("audioPlayer");
-          const sourceUrl = audioPlayer.src;
+          const sourceUrl = newAudioPlayer.src;
 
           // Создаем ссылку для скачивания файла
           const downloadLink = document.createElement("a");
           downloadLink.href = sourceUrl;
-          downloadLink.download = "audio.mp3";
+          downloadLink.download = `${songTitle}.mp3`;
           downloadLink.click();
         });
+      }
 
+      function saveSongToLocalStorage(songTitle, songUrl) {
+        const songs = JSON.parse(localStorage.getItem("songs")) || [];
+        const songExists = songs.some((song) => song.title === songTitle);
+        if (!songExists) {
+          songs.push({ title: songTitle, url: songUrl });
+          localStorage.setItem("songs", JSON.stringify(songs));
+        }
+      }
+
+      function loadSongsFromLocalStorage() {
+        const songs = JSON.parse(localStorage.getItem("songs")) || [];
+        songs.forEach((song) => addAudioPlayer(song.title, song.url));
+      }
+
+      function removeSongFromLocalStorage(songTitle) {
+        const songs = JSON.parse(localStorage.getItem("songs")) || [];
+        const updatedSongs = songs.filter((song) => song.title !== songTitle);
+        localStorage.setItem("songs", JSON.stringify(updatedSongs));
+      }
+
+      // Загружаем сохраненные песни при загрузке страницы
+      window.addEventListener("load", loadSongsFromLocalStorage);
+
+      // Обработчик формы авторизации
       document
         .getElementById("auth-form")
         .addEventListener("submit", async function (event) {

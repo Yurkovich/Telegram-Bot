@@ -10,6 +10,7 @@ def check_and_send_file(file_path: str):
     else:
         raise HTTPException(status_code=404, detail="File not found")
 
+
 def search_and_download_music(query: str) -> str:
     result_search = Search(query)
     if len(result_search.results) > 0:
@@ -39,4 +40,3 @@ def search_and_download_music(query: str) -> str:
     else:
         print("Результаты поиска не найдены")
         return None
-

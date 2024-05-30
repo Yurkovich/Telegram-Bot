@@ -9,7 +9,7 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(task_template)
 app.include_router(router)
-
+app.mount("/downloads", StaticFiles(directory="C:/Education/Самоучеба/16.05.24/downloads"), name="downloads")
 
 if __name__ == '__main__':
     print('Starting server')
